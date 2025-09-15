@@ -1,99 +1,76 @@
-import puppeteer from "puppeteer";
-import Jimp from "jimp";
-import dotenv from "dotenv";
-dotenv.config();
+import puppeteer from 'puppeteer';
+import fs from 'fs';
+import path from 'path';
+import optimizeChart from './optimizeChart.js'; // Yerel modülü içe aktar
 
-// === Pixel kontrol koordinatları ve renkler ===
-const CHECK_REGION = { x: 1773, y: 139, width: 22, height: 25 };
-const BUY_COLOR = { r: 76, g: 175, b: 80 };
-const SELL_COLOR = { r: 255, g: 82, b: 82 };
-
-// === Yardımcı: Renk benzerliği kontrolü ===
-function colorsAreSimilar(c1, c2, tolerance = 20) {
-  return (
-    Math.abs(c1.r - c2.r) <= tolerance &&
-    Math.abs(c1.g - c2.g) <= tolerance &&
-    Math.abs(c1.b - c2.b) <= tolerance
-  );
+// Ekran görüntülerinin kaydedileceği klasör
+const screenshotsDir = path.join(process.cwd(), 'screenshots');
+if (!fs.existsSync(screenshotsDir)) {
+  fs.mkdirSync(screenshotsDir, { recursive: true });
 }
 
-// === OptimizeChart ===
-async function optimizeChart(page) {
-  await page.evaluate(() => {
-    document.querySelectorAll(".price-axis, .time-axis, .chart-markup-table").forEach(el => el.style.display = "none");
-    document.querySelectorAll("canvas").forEach(el => {
-      if (
-        el.parentElement?.className?.includes("price-axis") ||
-        el.parentElement?.className?.includes("time-axis") ||
-        el.parentElement?.className?.includes("chart-container")
-      ) el.style.display = "none";
-    });
-    document.querySelectorAll(".drawing-toolbar, .layout__area--left, .chart-controls-bar, .header-toolbar")
-      .forEach(el => (el.style.display = "none"));
-  });
-}
+// Ana fonksiyon
+async function takeChartScreenshot() {
+  let browser;
+  console.log('Tarayıcı başlatılıyor...');
 
-// === Pixel analizi ===
-async function checkSignal(page) {
-  const screenshot = await page.screenshot();
-  const image = await Jimp.read(screenshot);
-
-  let buyCount = 0;
-  let sellCount = 0;
-
-  for (let dx = 0; dx < CHECK_REGION.width; dx++) {
-    for (let dy = 0; dy < CHECK_REGION.height; dy++) {
-      const px = CHECK_REGION.x + dx;
-      const py = CHECK_REGION.y + dy;
-      const pixelColor = Jimp.intToRGBA(image.getPixelColor(px, py));
-      if (colorsAreSimilar(pixelColor, BUY_COLOR)) buyCount++;
-      if (colorsAreSimilar(pixelColor, SELL_COLOR)) sellCount++;
-    }
-  }
-
-  if (buyCount > sellCount && buyCount > 10) {
-    console.log("📗 BUY sinyali tespit edildi!");
-    return "BUY";
-  } else if (sellCount > buyCount && sellCount > 10) {
-    console.log("📕 SELL sinyali tespit edildi!");
-    return "SELL";
-  }
-  console.log("⏳ Sinyal yok...");
-  return null;
-}
-
-// === Ana Bot ===
-(async () => {
-  const browser = await puppeteer.launch({
-    headless: "new",
-    defaultViewport: { width: 1920, height: 1080 },
-    executablePath: "/usr/bin/google-chrome-stable",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-  });
-
-  const page = await browser.newPage();
-
-  console.log("📂 TradingView açılıyor...");
   try {
-    await page.goto("https://www.tradingview.com/chart/", {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
+    // Tarayıcıyı Render.com ortamı için önerilen ayarlarla başlat
+    browser = await puppeteer.launch({
+      executablePath: '/usr/bin/google-chrome-stable', // render-build.sh ile kurulan Chrome'un yolu
+      headless: 'new', // Yeni headless modu önerilir
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // Paylaşılan bellek sorunlarını önler
+        '--single-process',
+        '--window-size=1920,1080' // Pencere boyutunu belirle
+      ]
     });
-  } catch (err) {
-    console.error("⛔ Sayfa yükleme hatası:", err.message);
-    await browser.close();
-    process.exit(1);
-  }
 
-  console.log("⚡ Grafik optimize ediliyor...");
-  await optimizeChart(page);
+    console.log('Tarayıcı başarıyla başlatıldı.');
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1920, height: 1080 });
 
-  console.log("👀 Pixel analizi başlıyor...");
-  setInterval(async () => {
-    try {
-      await checkSignal(page);
-    } catch (err) {
-      console.error("Pixel analizi hatası:", err.message);
+    // Örnek bir TradingView URL'si (Bunu istediğinizle değiştirebilirsiniz)
+    const chartUrl = 'https://www.tradingview.com/chart/?symbol=NASDAQ:AAPL';
+    console.log(`Grafik sayfasına gidiliyor: ${chartUrl}`);
+    
+    // Sayfaya git ve tamamen yüklenmesini bekle
+    await page.goto(chartUrl, { waitUntil: 'networkidle0', timeout: 60000 });
+    console.log('Sayfa yüklendi.');
+
+    // Grafiğin arayüzünü temizlemek için harici fonksiyonu çağır
+    console.log('Grafik arayüzü optimize ediliyor...');
+    await optimizeChart(page); //
+    console.log('Optimizasyon tamamlandı.');
+
+    // Grafiğin bulunduğu ana elementi hedef al
+    const chartElement = await page.$('.chart-gui-wrapper');
+    if (!chartElement) {
+        throw new Error('Grafik elementi sayfada bulunamadı!');
     }
-  }, 5000);
-})();
+
+    const screenshotPath = path.join(screenshotsDir, 'tradingview-chart.png');
+    console.log(`Ekran görüntüsü alınıyor ve şuraya kaydediliyor: ${screenshotPath}`);
+
+    // Sadece grafik elementinin ekran görüntüsünü al
+    await chartElement.screenshot({
+      path: screenshotPath,
+      omitBackground: true
+    });
+
+    console.log('Ekran görüntüsü başarıyla alındı.');
+
+  } catch (error) {
+    console.error('Bir hata oluştu:', error);
+  } finally {
+    if (browser) {
+      console.log('Tarayıcı kapatılıyor...');
+      await browser.close();
+    }
+  }
+}
+
+// Ana fonksiyonu çalıştır
+takeChartScreenshot();
