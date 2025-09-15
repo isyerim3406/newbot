@@ -1,12 +1,12 @@
 {
   "name": "tradingview-bot",
   "version": "1.0.0",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "puppeteer": "^23.1.0",
-    "node-fetch": "2.6.7"
+    "puppeteer": "^23.11.1",
+    "express": "^4.18.2"
   }
 }
