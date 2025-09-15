@@ -1,41 +1,60 @@
+// index.js
 import puppeteer from 'puppeteer';
-import express from 'express';
+import fs from 'fs';
 
-// Env değişkeninden cookie base64
-const cookieBase64 = process.env.TV_COOKIE_BASE64;
-if (!cookieBase64) {
-  console.error("TV_COOKIE_BASE64 env değişkeni bulunamadı!");
+// Environment variable'dan cookie base64 al
+const b64_cookie = process.env.TV_COOKIE_BASE64;
+
+if (!b64_cookie) {
+  console.error("TV_COOKIE_BASE64 env variable bulunamadı!");
   process.exit(1);
 }
-const cookies = JSON.parse(Buffer.from(cookieBase64, 'base64').toString('utf-8'));
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+// Base64'ten JSON'a decode et
+let cookies;
+try {
+  cookies = JSON.parse(Buffer.from(b64_cookie, 'base64').toString());
+} catch (err) {
+  console.error("Cookie decode hatası:", err);
+  process.exit(1);
+}
 
-async function startBrowser() {
-  console.log('==> Chrome başlatılıyor...');
+(async () => {
+  console.log("==> Chrome başlatılıyor...");
+
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    headless: true, // Render'da headless olmalı
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
   const page = await browser.newPage();
-  await page.setCookie(...cookies);
 
+  // Cookies'i sayfaya uygula
   try {
-    // Timeout 120 saniyeye çıkarıldı
-    await page.goto('https://www.tradingview.com/', { waitUntil: 'networkidle2', timeout: 120000 });
-    console.log('==> TradingView sayfasına giriş yapıldı (cookie ile)');
+    await page.setCookie(...cookies);
+    console.log("==> Cookies yüklendi.");
   } catch (err) {
-    console.error('==> Sayfaya gitmede timeout:', err.message);
+    console.error("Cookie setleme hatası:", err);
+    await browser.close();
+    process.exit(1);
   }
 
-  return { browser, page };
-}
+  // TradingView ana sayfasına git
+  try {
+    await page.goto('https://www.tradingview.com/', { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log("==> TradingView sayfası açıldı.");
+  } catch (err) {
+    console.error("Sayfa açılırken timeout:", err);
+    await browser.close();
+    process.exit(1);
+  }
 
-startBrowser().then(({ browser, page }) => {
-  console.log('==> Bot hazır, sinyalleri bekliyor...');
-});
+  // Buradan sonra sayfada oturum açık, sinyal yakalama veya başka işlemler yapılabilir
+  console.log("==> Login başarılı, sinyal bekleme aşamasına geçilebilir.");
 
-app.get('/', (req, res) => res.send('TradingView Bot Alive ✅'));
-app.listen(PORT, () => console.log(`==> Server port ${PORT} üzerinde dinleniyor`));
+  // Örnek: screenshot al
+  await page.screenshot({ path: 'tv_home.png' });
+
+  // Browser kapat
+  await browser.close();
+})();
