@@ -4,7 +4,7 @@ const http = require('http');
 
 const PORT = process.env.PORT || 3000;
 
-// Basit HTTP server (Render port check için)
+// Basit HTTP server (Render port kontrolü için)
 http.createServer((req, res) => {
     res.writeHead(200, {'Content-Type': 'text/plain'});
     res.end('TradingView bot çalışıyor ✅');
@@ -25,9 +25,9 @@ http.createServer((req, res) => {
 
     console.log('==> Sayfa açıldı:', await page.title());
 
-    // Burada bot mantığını ekleyebilirsin
-    // Örnek: veri çekme veya screenshot
-    // await page.screenshot({path: 'tradingview.png'});
+    // Örnek veri çekme
+    // const content = await page.content();
+    // console.log(content);
 
     // Chrome açık kalsın, Render container sürekli çalışacak
 })();
