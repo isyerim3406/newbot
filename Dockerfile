@@ -1,28 +1,44 @@
-# Base image
-FROM node:18-slim
+# 1️⃣ Base image olarak Node 18 kullanıyoruz
+FROM node:18
 
-# Chrome ve gerekli kütüphaneler
-RUN apt-get update && apt-get install -y \
-    wget gnupg unzip \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
-    && apt-get update && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Working directory
+# 2️⃣ Çalışma dizini
 WORKDIR /app
 
-# package.json ve package-lock.json
+# 3️⃣ package.json ve package-lock.json'u kopyala
 COPY package*.json ./
 
-# npm install
+# 4️⃣ Gerekli paketleri yükle
 RUN npm install
 
-# Uygulama dosyalarını kopyala
+# 5️⃣ Tüm proje dosyalarını kopyala
 COPY . .
 
-# Port (isteğe bağlı)
-EXPOSE 3000
+# 6️⃣ Puppeteer için gerekli kütüphaneler
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
-# Başlatma komutu
-CMD ["npm", "start"]
+# 7️⃣ Port ayarı
+EXPOSE 10000
+
+# 8️⃣ Start komutu
+CMD ["node", "index.js"]
