@@ -1,18 +1,12 @@
 {
   "name": "tradingview-bot",
   "version": "1.0.0",
-  "description": "TradingView sinyal botu + Telegram bildirim",
-  "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
-  "engines": {
-    "node": ">=18"
-  },
   "dependencies": {
-    "selenium-webdriver": "^4.15.0",
-    "chromedriver": "^140.0.2",
-    "node-fetch": "^3.3.2",
-    "dotenv": "^16.3.1"
+    "puppeteer": "^23.1.0",
+    "node-fetch": "2.6.7"
   }
 }
