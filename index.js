@@ -5,8 +5,8 @@ dotenv.config();
 
 // === Pixel kontrol koordinatları ve renkler ===
 const CHECK_REGION = { x: 1773, y: 139, width: 22, height: 25 };
-const BUY_COLOR = { r: 76, g: 175, b: 80 };      // Yeşil
-const SELL_COLOR = { r: 255, g: 82, b: 82 };     // Kırmızı
+const BUY_COLOR = { r: 76, g: 175, b: 80 };
+const SELL_COLOR = { r: 255, g: 82, b: 82 };
 
 // === Yardımcı: Renk benzerliği kontrolü ===
 function colorsAreSimilar(c1, c2, tolerance = 20) {
@@ -17,24 +17,18 @@ function colorsAreSimilar(c1, c2, tolerance = 20) {
   );
 }
 
-// === OptimizeChart: gereksiz öğeleri gizle ===
+// === OptimizeChart ===
 async function optimizeChart(page) {
   await page.evaluate(() => {
-    document.querySelectorAll(".price-axis").forEach(el => (el.style.display = "none"));
-    document.querySelectorAll(".time-axis").forEach(el => (el.style.display = "none"));
-    document.querySelectorAll(".chart-markup-table").forEach(el => (el.style.display = "none"));
+    document.querySelectorAll(".price-axis, .time-axis, .chart-markup-table").forEach(el => el.style.display = "none");
     document.querySelectorAll("canvas").forEach(el => {
       if (
         el.parentElement?.className?.includes("price-axis") ||
         el.parentElement?.className?.includes("time-axis") ||
         el.parentElement?.className?.includes("chart-container")
-      ) {
-        el.style.display = "none";
-      }
+      ) el.style.display = "none";
     });
-    document.querySelectorAll(".drawing-toolbar, .layout__area--left")
-      .forEach(el => (el.style.display = "none"));
-    document.querySelectorAll(".chart-controls-bar, .header-toolbar")
+    document.querySelectorAll(".drawing-toolbar, .layout__area--left, .chart-controls-bar, .header-toolbar")
       .forEach(el => (el.style.display = "none"));
   });
 }
@@ -52,7 +46,6 @@ async function checkSignal(page) {
       const px = CHECK_REGION.x + dx;
       const py = CHECK_REGION.y + dy;
       const pixelColor = Jimp.intToRGBA(image.getPixelColor(px, py));
-
       if (colorsAreSimilar(pixelColor, BUY_COLOR)) buyCount++;
       if (colorsAreSimilar(pixelColor, SELL_COLOR)) sellCount++;
     }
@@ -65,7 +58,6 @@ async function checkSignal(page) {
     console.log("📕 SELL sinyali tespit edildi!");
     return "SELL";
   }
-
   console.log("⏳ Sinyal yok...");
   return null;
 }
@@ -73,9 +65,9 @@ async function checkSignal(page) {
 // === Ana Bot ===
 (async () => {
   const browser = await puppeteer.launch({
-    headless: "new", // yeni headless modu
+    headless: "new",
     defaultViewport: { width: 1920, height: 1080 },
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome-stable",
+    executablePath: "/usr/bin/google-chrome-stable",
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
 
@@ -84,8 +76,8 @@ async function checkSignal(page) {
   console.log("📂 TradingView açılıyor...");
   try {
     await page.goto("https://www.tradingview.com/chart/", {
-      waitUntil: "domcontentloaded", // network idle yerine DOM yüklendiğinde devam
-      timeout: 60000 // 60 saniye
+      waitUntil: "domcontentloaded",
+      timeout: 60000
     });
   } catch (err) {
     console.error("⛔ Sayfa yükleme hatası:", err.message);
@@ -103,5 +95,5 @@ async function checkSignal(page) {
     } catch (err) {
       console.error("Pixel analizi hatası:", err.message);
     }
-  }, 5000); // her 5 saniyede bir kontrol
+  }, 5000);
 })();
