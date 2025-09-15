@@ -1,13 +1,18 @@
-version: '3.8'
-
 services:
-  bot:
-    build: .
-    container_name: tradingview-bot
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-    volumes:
-      - .:/app
-    ports:
-      - "3000:3000"   # Eğer web server varsa, gerekirse
+  - type: web
+    name: tradingview-bot
+    env: docker
+    repo: # your-repo-url-here
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
+      - key: CHROME_BIN
+        value: /usr/bin/google-chrome-stable
+    healthCheckPath: /
