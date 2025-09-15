@@ -6,8 +6,9 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "puppeteer-core": "^21.3.8",  // Chromium indirmeyen sürüm
+    "puppeteer": "^21.3.8",
     "jimp": "^0.22.10",
     "dotenv": "^16.3.1"
-  }
+  },
+  "_comment": "Puppeteer skip Chromium download handled via environment variable"
 }
