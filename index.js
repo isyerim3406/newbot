@@ -1,60 +1,66 @@
-// index.js
 import puppeteer from 'puppeteer';
-import fs from 'fs';
+import Jimp from 'jimp';  // pixel okuma için
 
-// Environment variable'dan cookie base64 al
-const b64_cookie = process.env.TV_COOKIE_BASE64;
-
-if (!b64_cookie) {
-  console.error("TV_COOKIE_BASE64 env variable bulunamadı!");
+const cookieB64 = process.env.TV_COOKIE_BASE64;
+if (!cookieB64) {
+  console.error("TV_COOKIE_BASE64 env değişkeni tanımlı değil!");
   process.exit(1);
 }
 
-// Base64'ten JSON'a decode et
-let cookies;
-try {
-  cookies = JSON.parse(Buffer.from(b64_cookie, 'base64').toString());
-} catch (err) {
-  console.error("Cookie decode hatası:", err);
-  process.exit(1);
+const cookies = JSON.parse(Buffer.from(cookieB64, 'base64').toString('utf-8'));
+
+// Pixel kontrol alanı
+const AREA = { x1: 1773, y1: 139, x2: 1795, y2: 164 };
+const BUY_RGB = { r: 76, g: 175, b: 80 };
+const SELL_RGB = { r: 255, g: 82, b: 82 };
+
+// Renk karşılaştırma toleransı
+const TOL = 10;
+
+function colorsMatch(c1, c2) {
+  return Math.abs(c1.r - c2.r) <= TOL &&
+         Math.abs(c1.g - c2.g) <= TOL &&
+         Math.abs(c1.b - c2.b) <= TOL;
 }
 
 (async () => {
-  console.log("==> Chrome başlatılıyor...");
-
   const browser = await puppeteer.launch({
-    headless: true, // Render'da headless olmalı
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: true,
+    defaultViewport: { width: 1920, height: 1080 },
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
-
   const page = await browser.newPage();
+  await page.setCookie(...cookies);
 
-  // Cookies'i sayfaya uygula
-  try {
-    await page.setCookie(...cookies);
-    console.log("==> Cookies yüklendi.");
-  } catch (err) {
-    console.error("Cookie setleme hatası:", err);
-    await browser.close();
-    process.exit(1);
+  const url = 'https://www.tradingview.com/chart/?symbol=BINANCE:ETHUSDT&interval=1';
+  console.log("Grafik açılıyor...");
+  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+  console.log("Grafik açıldı, pixel kontrol ediliyor...");
+
+  // Belirtilen alanın screenshot'unu al
+  const clip = {
+    x: AREA.x1,
+    y: AREA.y1,
+    width: AREA.x2 - AREA.x1,
+    height: AREA.y2 - AREA.y1
+  };
+  const screenshotBuffer = await page.screenshot({ clip });
+
+  // Jimp ile oku
+  const image = await Jimp.read(screenshotBuffer);
+
+  let signal = null;
+  for (let x = 0; x < clip.width; x++) {
+    for (let y = 0; y < clip.height; y++) {
+      const { r, g, b } = Jimp.intToRGBA(image.getPixelColor(x, y));
+      if (colorsMatch({ r, g, b }, BUY_RGB)) signal = 'BUY';
+      if (colorsMatch({ r, g, b }, SELL_RGB)) signal = 'SELL';
+      if (signal) break;
+    }
+    if (signal) break;
   }
 
-  // TradingView ana sayfasına git
-  try {
-    await page.goto('https://www.tradingview.com/', { waitUntil: 'networkidle2', timeout: 60000 });
-    console.log("==> TradingView sayfası açıldı.");
-  } catch (err) {
-    console.error("Sayfa açılırken timeout:", err);
-    await browser.close();
-    process.exit(1);
-  }
+  console.log("Sinyal:", signal || "Yok");
 
-  // Buradan sonra sayfada oturum açık, sinyal yakalama veya başka işlemler yapılabilir
-  console.log("==> Login başarılı, sinyal bekleme aşamasına geçilebilir.");
-
-  // Örnek: screenshot al
-  await page.screenshot({ path: 'tv_home.png' });
-
-  // Browser kapat
   await browser.close();
 })();
