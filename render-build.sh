@@ -33,6 +33,9 @@ rm /tmp/chromedriver.zip
 
 echo ">>> ChromeDriver kurulumu tamamlandı."
 
+# Puppeteer'ın kendi Chromium'u indirmesini engelle
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 # Proje build
 npm install
 npm run build || echo "npm run build yok, atlandı."
