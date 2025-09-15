@@ -1,5 +1,6 @@
-// index.js (Fixed Version with Better Error Handling)
+// index.js (Modern Version without puppeteer-extra)
 
+import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,19 +11,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Dynamic imports with error handling
-let puppeteer, StealthPlugin, JIMP, optimizeChart;
+let JIMP, optimizeChart;
 
 try {
-    console.log('Loading puppeteer-extra...');
-    const puppeteerExtraModule = await import('puppeteer-extra');
-    puppeteer = puppeteerExtraModule.default;
-    console.log('✓ puppeteer-extra loaded');
-
-    console.log('Loading stealth plugin...');
-    const stealthModule = await import('puppeteer-extra-plugin-stealth');
-    StealthPlugin = stealthModule.default;
-    console.log('✓ stealth plugin loaded');
-
     console.log('Loading JIMP...');
     const jimpModule = await import('jimp');
     JIMP = jimpModule.default;
@@ -39,11 +30,6 @@ try {
             console.log('Skipping chart optimization - module not available');
         };
     }
-
-    // Use Stealth plugin
-    puppeteer.use(StealthPlugin());
-    console.log('✓ Stealth plugin registered');
-
 } catch (error) {
     console.error('Failed to load dependencies:', error);
     process.exit(1);
@@ -71,10 +57,10 @@ async function takeChartScreenshot() {
         ].filter(Boolean);
 
         let executablePath;
-        for (const path of chromePaths) {
-            if (fs.existsSync(path)) {
-                executablePath = path;
-                console.log(`✓ Chrome found at: ${path}`);
+        for (const chromePath of chromePaths) {
+            if (fs.existsSync(chromePath)) {
+                executablePath = chromePath;
+                console.log(`✓ Chrome found at: ${chromePath}`);
                 break;
             }
         }
@@ -92,7 +78,9 @@ async function takeChartScreenshot() {
                 '--disable-gpu',
                 '--window-size=1920,1080',
                 '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
+                '--disable-features=VizDisplayCompositor',
+                '--disable-blink-features=AutomationControlled',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ]
         };
 
@@ -104,7 +92,32 @@ async function takeChartScreenshot() {
         console.log('✓ Browser launched successfully');
 
         const page = await browser.newPage();
+        
+        // Add stealth techniques manually
+        await page.evaluateOnNewDocument(() => {
+            // Remove webdriver property
+            delete Object.getPrototypeOf(navigator).webdriver;
+            
+            // Mock languages and plugins
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en']
+            });
+            
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            
+            // Mock permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+        });
+
         await page.setViewport({ width: 1920, height: 1080 });
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         const chartUrl = 'https://www.tradingview.com/chart/?symbol=BINANCE:ETHUSDT.P&interval=1';
         console.log(`Grafik sayfasına gidiliyor: ${chartUrl}`);
@@ -129,6 +142,22 @@ async function takeChartScreenshot() {
             }
         } catch (error) {
             console.log('Kapatılacak bir pop-up bulunamadı, devam ediliyor.');
+        }
+
+        // Additional popup handling
+        try {
+            const closeButtons = await page.$$('button[aria-label="Close"], button[data-name="close"], .close-button, .modal-close');
+            for (const button of closeButtons) {
+                try {
+                    await button.click();
+                    console.log('Pop-up kapatıldı');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (e) {
+                    // Ignore if button is not clickable
+                }
+            }
+        } catch (error) {
+            console.log('Ek pop-up kontrolü tamamlandı');
         }
 
         // Grafik arayüzünü optimize et
