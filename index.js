@@ -1,7 +1,8 @@
 require('dotenv').config();
 const { Builder, By, Key, until } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
-const fetch = require('node-fetch');
+
+// node-fetch kaldırıldı, fetch artık global
 
 (async function main() {
     let options = new chrome.Options();
@@ -29,11 +30,10 @@ const fetch = require('node-fetch');
         await driver.findElement(By.name('password')).sendKeys(process.env.TV_PASSWORD, Key.RETURN);
         console.log('==> TradingView login yapıldı');
 
-        // --- Sinyal kontrolü (örnek) ---
-        // Buraya TradingView grafiği açıp sinyal çekme kodu gelecek
         await driver.sleep(5000); // sayfanın yüklenmesini bekle
 
-        const signal = "AL"; // örnek sinyal, burada TradingView’den alınacak
+        const signal = "AL"; // örnek sinyal
+
         console.log('==> Sinyal:', signal);
 
         // --- Telegram bildirimi ---
