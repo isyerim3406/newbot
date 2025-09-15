@@ -1,12 +1,10 @@
-// index.js
-import puppeteer from 'puppeteer'; // ES Modules kullanıyoruz
-import fetch from 'node-fetch'; // ES Modules ile import
-
-import http from 'http';
+const puppeteer = require('puppeteer');
+const fetch = require('node-fetch');
+const http = require('http');
 
 const PORT = process.env.PORT || 3000;
 
-// Basit HTTP server
+// Basit HTTP server (Render port check için)
 http.createServer((req, res) => {
     res.writeHead(200, {'Content-Type': 'text/plain'});
     res.end('TradingView bot çalışıyor ✅');
@@ -14,7 +12,7 @@ http.createServer((req, res) => {
     console.log(`==> Server port ${PORT} üzerinde dinleniyor`);
 });
 
-// Puppeteer ile TradingView bot örneği
+// Puppeteer bot örneği
 (async () => {
     console.log('==> Chrome başlatılıyor...');
     const browser = await puppeteer.launch({
