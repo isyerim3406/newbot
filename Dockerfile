@@ -12,8 +12,14 @@ WORKDIR /app
 # package.json ve package-lock.json kopyala
 COPY package*.json ./
 
-# npm install (Puppeteer'in tarayıcı indirmesini engelleyeceğiz)
-RUN npm install --omit=dev
+# package.json ve package-lock.json kopyala
+COPY package*.json ./
+
+# npm install komutunu --production ile güncelle
+RUN npm install --production --unsafe-perm --fetch-timeout=120000
+
+# Uygulama dosyalarını kopyala
+COPY . .
 
 # Uygulama dosyalarını kopyala
 COPY . .
@@ -23,3 +29,4 @@ EXPOSE 3000
 
 # Başlatma komutu
 CMD ["node", "index.js"]
+
