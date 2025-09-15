@@ -1,4 +1,3 @@
-# Base image
 FROM node:18-slim
 
 # Chrome ve gerekli kütüphaneler
@@ -13,20 +12,14 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Working directory
 WORKDIR /app
 
-# package.json ve package-lock.json kopyala
 COPY package*.json ./
 
-# npm install
 RUN npm install --omit=dev
 
-# Uygulama dosyalarını kopyala
 COPY . .
 
-# Port (isteğe bağlı)
 EXPOSE 10000
 
-# Başlatma komutu
 CMD ["node", "index.js"]
