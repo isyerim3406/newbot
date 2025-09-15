@@ -20,16 +20,9 @@ function colorsAreSimilar(c1, c2, tolerance = 20) {
 // === OptimizeChart: gereksiz öğeleri gizle ===
 async function optimizeChart(page) {
   await page.evaluate(() => {
-    // Fiyat ekseni (sağdaki panel)
     document.querySelectorAll(".price-axis").forEach(el => (el.style.display = "none"));
-
-    // Zaman ekseni (alttaki tarih paneli)
     document.querySelectorAll(".time-axis").forEach(el => (el.style.display = "none"));
-
-    // Grid çizgileri
     document.querySelectorAll(".chart-markup-table").forEach(el => (el.style.display = "none"));
-
-    // Mum/bar/çubuk grafikleri
     document.querySelectorAll("canvas").forEach(el => {
       if (
         el.parentElement?.className?.includes("price-axis") ||
@@ -39,12 +32,8 @@ async function optimizeChart(page) {
         el.style.display = "none";
       }
     });
-
-    // Sol araç çubuğu
     document.querySelectorAll(".drawing-toolbar, .layout__area--left")
       .forEach(el => (el.style.display = "none"));
-
-    // Üst menü
     document.querySelectorAll(".chart-controls-bar, .header-toolbar")
       .forEach(el => (el.style.display = "none"));
   });
@@ -85,7 +74,9 @@ async function checkSignal(page) {
 (async () => {
   const browser = await puppeteer.launch({
     headless: true,
-    defaultViewport: { width: 1920, height: 1080 }
+    defaultViewport: { width: 1920, height: 1080 },
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome-stable",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"] // <-- Docker root için eklendi
   });
 
   const page = await browser.newPage();
