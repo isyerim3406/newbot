@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y \
     && apt-get update && apt-get install -y google-chrome-stable --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# ChromeDriver kurulumu (Chrome sürümüne uyumlu)
+# ChromeDriver kurulumu (Chrome sürümüne uyumlu, erişim garantili)
 RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') \
     && CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1) \
-    && DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR}") \
+    && DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR}_LATEST") \
+    && echo ">>> ChromeDriver sürümü: $DRIVER_VERSION" \
     && wget -O /tmp/chromedriver.zip https://storage.googleapis.com/chrome-for-testing/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip \
     && unzip /tmp/chromedriver.zip -d /tmp/ \
     && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
