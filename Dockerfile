@@ -1,44 +1,29 @@
-# 1️⃣ Base image olarak Node 18 kullanıyoruz
-FROM node:18
+# Node 18 slim tabanlı image
+FROM node:18-slim
 
-# 2️⃣ Çalışma dizini
-WORKDIR /app
+# Ortam değişkeni: Chromium indirmesini atla
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-# 3️⃣ package.json ve package-lock.json'u kopyala
-COPY package*.json ./
-
-# 4️⃣ Gerekli paketleri yükle
-RUN npm install
-
-# 5️⃣ Tüm proje dosyalarını kopyala
-COPY . .
-
-# 6️⃣ Puppeteer için gerekli kütüphaneler
+# Chrome kurulumu
 RUN apt-get update && apt-get install -y \
-    wget \
-    ca-certificates \
-    fonts-liberation \
-    libappindicator3-1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    xdg-utils \
-    --no-install-recommends \
+    wget gnupg unzip \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
+    && apt-get update && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# 7️⃣ Port ayarı
-EXPOSE 10000
+# Çalışma dizini
+WORKDIR /app
 
-# 8️⃣ Start komutu
+# package.json ve package-lock.json kopyala
+COPY package*.json ./
+
+# Node modülleri kurulumu
+RUN npm install
+
+# Uygulama dosyalarını kopyala
+COPY . .
+
+# Port ve başlatma
+EXPOSE 10000
 CMD ["node", "index.js"]
