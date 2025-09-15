@@ -1,66 +1,70 @@
-import puppeteer from 'puppeteer';
+// index.js (Tüm dosyanın güncel hali)
+
+// puppeteer yerine puppeteer-extra'yı içe aktar
+import puppeteer from 'puppeteer-extra';
+// Stealth eklentisini içe aktar
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
 import fs from 'fs';
 import path from 'path';
-import optimizeChart from './optimizeChart.js'; // Yerel modülü içe aktar
+import optimizeChart from './optimizeChart.js';
 
-// Ekran görüntülerinin kaydedileceği klasör
-const screenshotsDir = path.join(process.cwd(), 'screenshots');
-if (!fs.existsSync(screenshotsDir)) {
-  fs.mkdirSync(screenshotsDir, { recursive: true });
-}
+// Stealth eklentisini puppeteer'a tanıt
+puppeteer.use(StealthPlugin());
 
-// Ana fonksiyon
+// ... (geri kalan kodunuz aynı kalabilir) ...
+
 async function takeChartScreenshot() {
   let browser;
   console.log('Tarayıcı başlatılıyor...');
 
   try {
-    // Tarayıcıyı Render.com ortamı için önerilen ayarlarla başlat
-    browser = await puppeteer.launch({
-      executablePath: '/usr/bin/google-chrome-stable', // render-build.sh ile kurulan Chrome'un yolu
-      headless: 'new', // Yeni headless modu önerilir
+    browser = await puppeteer.launch({ // puppeteer.launch() olarak kalacak
+      executablePath: '/usr/bin/google-chrome-stable',
+      headless: 'new',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // Paylaşılan bellek sorunlarını önler
-        '--single-process',
-        '--window-size=1920,1080' // Pencere boyutunu belirle
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process', // Bu özellikle düşük RAM'li ortamlarda yardımcı olabilir
+        '--disable-gpu',
+        '--window-size=1920,1080'
       ]
     });
+    
+    // ...
 
-    console.log('Tarayıcı başarıyla başlatıldı.');
     const page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1080 });
 
-    // Örnek bir TradingView URL'si (Bunu istediğinizle değiştirebilirsiniz)
     const chartUrl = 'https://www.tradingview.com/chart/?symbol=NASDAQ:AAPL';
     console.log(`Grafik sayfasına gidiliyor: ${chartUrl}`);
     
-    // Sayfaya git ve tamamen yüklenmesini bekle
-    await page.goto(chartUrl, { waitUntil: 'networkidle0', timeout: 60000 });
-    console.log('Sayfa yüklendi.');
+    // 1. ADIMDAKİ GÜNCELLEME BURADA
+    await page.goto(chartUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 120000
+    });
+    
+    console.log('Sayfa yüklendi, grafik elementi bekleniyor...');
+    await page.waitForSelector('.chart-gui-wrapper', { timeout: 120000 });
+    console.log('Grafik elementi bulundu.');
 
-    // Grafiğin arayüzünü temizlemek için harici fonksiyonu çağır
+    // ... (kodun geri kalanı - optimizeChart, screenshot vs.)
+    
     console.log('Grafik arayüzü optimize ediliyor...');
-    await optimizeChart(page); //
+    await optimizeChart(page);
     console.log('Optimizasyon tamamlandı.');
 
-    // Grafiğin bulunduğu ana elementi hedef al
     const chartElement = await page.$('.chart-gui-wrapper');
     if (!chartElement) {
         throw new Error('Grafik elementi sayfada bulunamadı!');
     }
-
-    const screenshotPath = path.join(screenshotsDir, 'tradingview-chart.png');
-    console.log(`Ekran görüntüsü alınıyor ve şuraya kaydediliyor: ${screenshotPath}`);
-
-    // Sadece grafik elementinin ekran görüntüsünü al
-    await chartElement.screenshot({
-      path: screenshotPath,
-      omitBackground: true
-    });
-
-    console.log('Ekran görüntüsü başarıyla alındı.');
+    
+    // ... ekran görüntüsü alma ve diğer işlemleriniz ...
 
   } catch (error) {
     console.error('Bir hata oluştu:', error);
@@ -72,5 +76,4 @@ async function takeChartScreenshot() {
   }
 }
 
-// Ana fonksiyonu çalıştır
 takeChartScreenshot();
