@@ -73,16 +73,25 @@ async function checkSignal(page) {
 // === Ana Bot ===
 (async () => {
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: "new", // yeni headless modu
     defaultViewport: { width: 1920, height: 1080 },
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome-stable",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"] // <-- Docker root için eklendi
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
 
   const page = await browser.newPage();
 
   console.log("📂 TradingView açılıyor...");
-  await page.goto("https://www.tradingview.com/chart/", { waitUntil: "networkidle2" });
+  try {
+    await page.goto("https://www.tradingview.com/chart/", {
+      waitUntil: "domcontentloaded", // network idle yerine DOM yüklendiğinde devam
+      timeout: 60000 // 60 saniye
+    });
+  } catch (err) {
+    console.error("⛔ Sayfa yükleme hatası:", err.message);
+    await browser.close();
+    process.exit(1);
+  }
 
   console.log("⚡ Grafik optimize ediliyor...");
   await optimizeChart(page);
