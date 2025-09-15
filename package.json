@@ -1,18 +1,13 @@
 {
-  "name": "tv-pixel-bot",
+  "name": "tradingview-bot",
   "version": "1.0.0",
-  "type": "module",
-  "engines": { "node": ">=18" },
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "test:chrome": "node test_chrome.js",
-    "pixel": "node pixel_monitor.js"
-  },
   "dependencies": {
-    "puppeteer-core": "^21.3.8",
-    "pngjs": "^7.0.0",
-    "node-fetch": "^3.3.2",
-    "dotenv": "^16.4.5"
+    "selenium-webdriver": "^4.12.0",
+    "chromedriver": "^114.0.0",
+    "puppeteer": "^23.1.0"   // Eğer puppeteer kullanacaksan
+  },
+  "scripts": {
+    "start": "node index.js"
   }
 }
