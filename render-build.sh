@@ -1,110 +1,38 @@
 #!/usr/bin/env bash
-set -o errexit
-set -o nounset
-set -o pipefail
+set -e
 
-STORAGE_DIR=/opt/render/project/.render
-CHROME_DIR="$STORAGE_DIR/chrome"
-CHROMEDRIVER_DIR="$STORAGE_DIR/chromedriver"
+echo ">>> Chrome ve ChromeDriver kurulumu başlıyor..."
 
-mkdir -p "$CHROME_DIR"
-mkdir -p "$CHROMEDRIVER_DIR"
+apt-get update
+apt-get install -y wget curl unzip gnupg --no-install-recommends
 
-echo "Using storage dir: $STORAGE_DIR"
+# Google Chrome indir ve kur
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+apt-get update
+apt-get install -y google-chrome-stable --no-install-recommends
 
-DEB="$CHROME_DIR/google-chrome-stable_current_amd64.deb"
-CHROME_BIN="$CHROME_DIR/opt/google/chrome/google-chrome"
+# Chrome sürümünü al
+CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
+CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
+echo ">>> Yüklü Chrome sürümü: $CHROME_VERSION (major: $CHROME_MAJOR)"
 
-# Try extract google chrome .deb
-if [[ ! -x "$CHROME_BIN" ]]; then
-  echo "Downloading Google Chrome .deb..."
-  wget -q --show-progress https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O "$DEB" || true
+# ChromeDriver versiyonunu bul
+DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR}")
+echo ">>> ChromeDriver versiyonu bulundu: $DRIVER_VERSION"
 
-  if [[ -f "$DEB" ]]; then
-    echo "Extracting .deb (dpkg -x fallback to ar+tar)..."
-    if dpkg -x "$DEB" "$CHROME_DIR" 2>/dev/null; then
-      echo "dpkg -x ok"
-    else
-      echo "dpkg failed, trying ar + tar fallback..."
-      cd "$CHROME_DIR"
-      ar x "$DEB"
-      if [[ -f data.tar.xz ]]; then
-        tar -xf data.tar.xz -C "$CHROME_DIR"
-      elif [[ -f data.tar.gz ]]; then
-        tar -xf data.tar.gz -C "$CHROME_DIR"
-      else
-        echo "No data.tar.* in .deb, removing and will fallback to chrome-for-testing"
-        rm -f "$DEB"
-      fi
-      cd - >/dev/null || true
-    fi
-  fi
-fi
+# ChromeDriver indir
+DRIVER_URL="https://storage.googleapis.com/chrome-for-testing/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip"
+echo ">>> ChromeDriver indiriliyor: $DRIVER_URL"
+wget -O /tmp/chromedriver.zip $DRIVER_URL
 
-# fallback to chrome-for-testing if chrome binary missing
-if [[ ! -x "$CHROME_BIN" ]]; then
-  echo "Chrome binary not found, using chrome-for-testing fallback..."
-  CFT_DIR="$CHROME_DIR/chrome-for-testing"
-  mkdir -p "$CFT_DIR"
-  if [[ ! -f "$CFT_DIR/chrome-linux64.zip" ]]; then
-    wget -q --show-progress "https://storage.googleapis.com/chrome-for-testing/latest/linux64/chrome-linux64.zip" -O "$CFT_DIR/chrome-linux64.zip"
-    unzip -o "$CFT_DIR/chrome-linux64.zip" -d "$CFT_DIR" >/dev/null
-  fi
-  CHROME_BIN=$(ls "$CFT_DIR"/*/chrome 2>/dev/null | head -n1 || true)
-  if [[ -n "$CHROME_BIN" ]]; then
-    chmod +x "$CHROME_BIN"
-    echo "Using chrome-for-testing binary: $CHROME_BIN"
-  fi
-fi
+# Çıkart ve kur
+unzip /tmp/chromedriver.zip -d /usr/local/bin/
+chmod +x /usr/local/bin/chromedriver
+rm /tmp/chromedriver.zip
 
-if [[ -x "$CHROME_BIN" ]]; then
-  echo "Chrome binary available: $($CHROME_BIN --version 2>/dev/null || echo 'no version')"
-else
-  echo "ERROR: No chrome binary available after attempts."
-fi
+echo ">>> ChromeDriver kurulumu tamamlandı."
 
-# Detect chrome version
-CHROME_VER=""
-if [[ -x "$CHROME_BIN" ]]; then
-  CHROME_VER="$($CHROME_BIN --version | awk '{print $3}' 2>/dev/null || true)"
-fi
-CHROME_MAJOR="$(echo "$CHROME_VER" | cut -d. -f1 || true)"
-echo "Chrome version detected: $CHROME_VER (major: $CHROME_MAJOR)"
-
-# Chromedriver download (chrome-for-testing)
-DRIVER_DIR="$CHROMEDRIVER_DIR"
-mkdir -p "$DRIVER_DIR"
-
-if [[ ! -f "$DRIVER_DIR/chromedriver" ]]; then
-  echo "Attempting to fetch chromedriver via chrome-for-testing metadata..."
-  if [[ -n "$CHROME_MAJOR" ]]; then
-    META="https://googlechromelabs.github.io/chrome-for-testing/latest-$CHROME_MAJOR.json"
-    if curl --silent --fail "$META" -o /tmp/cdriver_meta.json; then
-      URL=$(jq -r '.downloads[]?.platforms[]? | select(.platform=="linux64") | .url' /tmp/cdriver_meta.json | head -n1 || true)
-    fi
-  fi
-
-  if [[ -z "${URL:-}" ]]; then
-    URL="https://storage.googleapis.com/chrome-for-testing/latest/linux64/chromedriver-linux64.zip"
-  fi
-
-  echo "Downloading chromedriver from: $URL"
-  wget -q --show-progress "$URL" -O "$DRIVER_DIR/chromedriver-linux64.zip"
-  unzip -o "$DRIVER_DIR/chromedriver-linux64.zip" -d "$DRIVER_DIR" >/dev/null
-  if [[ -f "$DRIVER_DIR/chromedriver" ]]; then
-    chmod +x "$DRIVER_DIR/chromedriver"
-  else
-    FOUND=$(find "$DRIVER_DIR" -type f -name chromedriver | head -n1 || true)
-    if [[ -n "$FOUND" ]]; then
-      mv "$FOUND" "$DRIVER_DIR/chromedriver" || true
-      chmod +x "$DRIVER_DIR/chromedriver" || true
-    fi
-  fi
-  rm -f "$DRIVER_DIR/chromedriver-linux64.zip"
-fi
-
-echo "Chromedriver version:"
-"$DRIVER_DIR/chromedriver" --version 2>/dev/null || echo "chromedriver not found"
-
-echo "Build script finished"
-cd "$HOME/project" || true
+# Proje build
+npm install
+npm run build || echo "npm run build yok, atlandı."
