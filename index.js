@@ -1,14 +1,18 @@
-// index.js (Modern Version without puppeteer-extra)
+// index.js (Web Service Version)
 
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import http from 'http';
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Port configuration
+const PORT = process.env.PORT || 10000;
 
 // Dynamic imports with error handling
 let JIMP, optimizeChart;
@@ -42,9 +46,22 @@ if (!fs.existsSync(screenshotsDir)) {
     console.log('✓ Screenshots directory created');
 }
 
+// Global variables to store results
+let lastResult = {
+    timestamp: new Date().toISOString(),
+    status: 'starting',
+    signal: 'none',
+    error: null,
+    pixelColor: null
+};
+
 async function takeChartScreenshot() {
     let browser;
     console.log('Tarayıcı başlatılıyor...');
+    
+    // Update status
+    lastResult.status = 'running';
+    lastResult.timestamp = new Date().toISOString();
 
     try {
         // Chrome executable paths to try
@@ -195,16 +212,37 @@ async function takeChartScreenshot() {
         const isGreen = g > r + 50 && g > b + 50;
         const isRed = r > g + 50 && r > b + 50;
 
+        let signal = 'none';
         if (isGreen) {
             console.log('Sinyal: Yeşil bulundu! 🟢');
+            signal = 'green';
         } else if (isRed) {
             console.log('Sinyal: Kırmızı bulundu! 🔴');
+            signal = 'red';
         } else {
             console.log('⏳ Sinyal yok...');
         }
 
+        // Update result
+        lastResult = {
+            timestamp: new Date().toISOString(),
+            status: 'completed',
+            signal: signal,
+            error: null,
+            pixelColor: { r, g, b }
+        };
+
+        return lastResult;
+
     } catch (error) {
         console.error('Bir hata oluştu:', error);
+        lastResult = {
+            timestamp: new Date().toISOString(),
+            status: 'error',
+            signal: 'none',
+            error: error.message,
+            pixelColor: null
+        };
         throw error;
     } finally {
         if (browser) {
@@ -214,14 +252,103 @@ async function takeChartScreenshot() {
     }
 }
 
-// Ana fonksiyonu çalıştır
-console.log('🚀 Bot başlatılıyor...');
-takeChartScreenshot()
-    .then(() => {
-        console.log('✓ İşlem başarıyla tamamlandı!');
-        process.exit(0);
-    })
-    .catch((error) => {
-        console.error('❌ İşlem başarısız:', error);
-        process.exit(1);
-    });
+// HTTP Server
+const server = http.createServer(async (req, res) => {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Content-Type', 'application/json');
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+    }
+
+    try {
+        switch (url.pathname) {
+            case '/':
+            case '/health':
+                res.writeHead(200);
+                res.end(JSON.stringify({
+                    status: 'healthy',
+                    message: 'TradingView Bot is running',
+                    timestamp: new Date().toISOString(),
+                    lastResult: lastResult
+                }));
+                break;
+
+            case '/scan':
+                console.log('🚀 Manual scan request received');
+                try {
+                    const result = await takeChartScreenshot();
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: true,
+                        ...result
+                    }));
+                } catch (error) {
+                    res.writeHead(500);
+                    res.end(JSON.stringify({
+                        success: false,
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+                break;
+
+            case '/status':
+                res.writeHead(200);
+                res.end(JSON.stringify(lastResult));
+                break;
+
+            default:
+                res.writeHead(404);
+                res.end(JSON.stringify({
+                    error: 'Endpoint not found',
+                    availableEndpoints: ['/', '/health', '/scan', '/status']
+                }));
+        }
+    } catch (error) {
+        console.error('Server error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({
+            error: 'Internal server error',
+            message: error.message
+        }));
+    }
+});
+
+// Periodic scanning (her 5 dakikada bir)
+setInterval(async () => {
+    try {
+        console.log('🔄 Periodic scan starting...');
+        await takeChartScreenshot();
+        console.log('✓ Periodic scan completed');
+    } catch (error) {
+        console.error('❌ Periodic scan failed:', error);
+    }
+}, 5 * 60 * 1000); // 5 minutes
+
+// Start server
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Bot server started on port ${PORT}`);
+    console.log(`Available endpoints:`);
+    console.log(`  - GET /health - Health check`);
+    console.log(`  - GET /scan - Manual scan`);
+    console.log(`  - GET /status - Last scan result`);
+    
+    // Run initial scan
+    setTimeout(async () => {
+        try {
+            console.log('🚀 Initial scan starting...');
+            await takeChartScreenshot();
+            console.log('✓ Initial scan completed');
+        } catch (error) {
+            console.error('❌ Initial scan failed:', error);
+        }
+    }, 5000); // Wait 5 seconds after server start
+});
