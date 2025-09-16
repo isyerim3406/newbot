@@ -1,4 +1,4 @@
-// index.js (Web Service Version)
+// index.js (Email ve Telegram Bildirimleri ile Düzeltilmiş Versiyon)
 
 import puppeteer from 'puppeteer';
 import fs from 'fs';
@@ -6,6 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import http from 'http';
+import nodemailer from 'nodemailer';
+import axios from 'axios';
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -14,28 +16,33 @@ const __dirname = dirname(__filename);
 // Port configuration
 const PORT = process.env.PORT || 10000;
 
+// Email ve Telegram yapılandırması
+const EMAIL_TO = 'cetintok@yahoo.com';
+const TELEGRAM_BOT_TOKEN = '8228322013:AAFEoX5PA76AoRFWA6H5k6Zn7x34RuVOXck';
+const TELEGRAM_CHAT_ID = '1347185585';
+
 // Dynamic imports with error handling
 let JIMP, optimizeChart;
 
 try {
-    console.log('Loading JIMP...');
+    console.log('JIMP yükleniyor...');
     const jimpModule = await import('jimp');
     JIMP = jimpModule.default;
-    console.log('✓ JIMP loaded');
+    console.log('✓ JIMP yüklendi');
 
-    console.log('Loading optimizeChart...');
+    console.log('optimizeChart yükleniyor...');
     try {
         const optimizeModule = await import('./optimizeChart.js');
         optimizeChart = optimizeModule.default;
-        console.log('✓ optimizeChart loaded');
+        console.log('✓ optimizeChart yüklendi');
     } catch (error) {
-        console.log('⚠️ optimizeChart not found, continuing without it');
+        console.log('⚠️ optimizeChart bulunamadı, devam ediliyor');
         optimizeChart = async (page) => {
-            console.log('Skipping chart optimization - module not available');
+            console.log('Grafik optimizasyonu atlanıyor - modül bulunamadı');
         };
     }
 } catch (error) {
-    console.error('Failed to load dependencies:', error);
+    console.error('Bağımlılıklar yüklenemedi:', error);
     process.exit(1);
 }
 
@@ -43,24 +50,112 @@ try {
 const screenshotsDir = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
-    console.log('✓ Screenshots directory created');
+    console.log('✓ Screenshots klasörü oluşturuldu');
 }
 
 // Global variables to store results
 let lastResult = {
     timestamp: new Date().toISOString(),
-    status: 'starting',
+    status: 'başlatılıyor',
     signal: 'none',
     error: null,
     pixelColor: null
 };
 
+// Email gönderme fonksiyonu
+async function sendEmail(screenshotPath, signalType) {
+    try {
+        // Gmail için nodemailer yapılandırması (app password gerekli)
+        const transporter = nodemailer.createTransporter({
+            service: 'gmail',
+            auth: {
+                user: 'your-email@gmail.com', // Buraya kendi Gmail adresinizi yazın
+                pass: 'your-app-password'      // Gmail App Password gerekli
+            }
+        });
+
+        const mailOptions = {
+            from: 'your-email@gmail.com',
+            to: EMAIL_TO,
+            subject: `TradingView Bot Sinyali: ${signalType}`,
+            text: `Sinyal tespit edildi: ${signalType}\nTarih: ${new Date().toLocaleString('tr-TR')}`,
+            attachments: [
+                {
+                    filename: 'chart-screenshot.png',
+                    path: screenshotPath
+                }
+            ]
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log('✓ Email başarıyla gönderildi');
+        return true;
+    } catch (error) {
+        console.error('❌ Email gönderme hatası:', error.message);
+        return false;
+    }
+}
+
+// Telegram mesaj gönderme fonksiyonu
+async function sendTelegramPhoto(screenshotPath, signalType) {
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+        
+        const formData = new FormData();
+        const imageBuffer = fs.readFileSync(screenshotPath);
+        const blob = new Blob([imageBuffer], { type: 'image/png' });
+        
+        formData.append('chat_id', TELEGRAM_CHAT_ID);
+        formData.append('photo', blob, 'chart-screenshot.png');
+        formData.append('caption', `🚨 TradingView Sinyali: ${signalType}\n📊 ETHUSDT.P\n⏰ ${new Date().toLocaleString('tr-TR')}`);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            console.log('✓ Telegram fotoğraf başarıyla gönderildi');
+            return true;
+        } else {
+            const errorData = await response.json();
+            console.error('❌ Telegram gönderme hatası:', errorData);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Telegram gönderme hatası:', error.message);
+        return false;
+    }
+}
+
+// 3 defa bildirim gönderme fonksiyonu
+async function sendNotifications(screenshotPath, signalType) {
+    console.log(`📧 ${signalType} sinyali için bildirimler gönderiliyor...`);
+    
+    for (let i = 1; i <= 3; i++) {
+        console.log(`📨 ${i}/3 bildirim gönderiliyor...`);
+        
+        // Telegram gönder
+        await sendTelegramPhoto(screenshotPath, signalType);
+        
+        // Email gönder (opsiyonel - Gmail yapılandırması gerekli)
+        // await sendEmail(screenshotPath, signalType);
+        
+        if (i < 3) {
+            console.log('⏳ 10 saniye bekleniyor...');
+            await new Promise(resolve => setTimeout(resolve, 10000)); // 10 saniye bekle
+        }
+    }
+    
+    console.log('✅ Tüm bildirimler gönderildi');
+}
+
 async function takeChartScreenshot() {
     let browser;
     console.log('Tarayıcı başlatılıyor...');
     
-    // Update status
-    lastResult.status = 'running';
+    // Durumu güncelle
+    lastResult.status = 'çalışıyor';
     lastResult.timestamp = new Date().toISOString();
 
     try {
@@ -77,7 +172,7 @@ async function takeChartScreenshot() {
         for (const chromePath of chromePaths) {
             if (fs.existsSync(chromePath)) {
                 executablePath = chromePath;
-                console.log(`✓ Chrome found at: ${chromePath}`);
+                console.log(`✓ Chrome bulundu: ${chromePath}`);
                 break;
             }
         }
@@ -106,16 +201,16 @@ async function takeChartScreenshot() {
         }
 
         browser = await puppeteer.launch(launchOptions);
-        console.log('✓ Browser launched successfully');
+        console.log('✓ Tarayıcı başarıyla başlatıldı');
 
         const page = await browser.newPage();
         
-        // Add stealth techniques manually
+        // Stealth teknikleri manuel olarak ekle
         await page.evaluateOnNewDocument(() => {
-            // Remove webdriver property
+            // Webdriver özelliğini kaldır
             delete Object.getPrototypeOf(navigator).webdriver;
             
-            // Mock languages and plugins
+            // Dil ve eklentileri taklit et
             Object.defineProperty(navigator, 'languages', {
                 get: () => ['en-US', 'en']
             });
@@ -124,7 +219,7 @@ async function takeChartScreenshot() {
                 get: () => [1, 2, 3, 4, 5]
             });
             
-            // Mock permissions
+            // İzinleri taklit et
             const originalQuery = window.navigator.permissions.query;
             window.navigator.permissions.query = (parameters) => (
                 parameters.name === 'notifications' ?
@@ -140,41 +235,73 @@ async function takeChartScreenshot() {
         console.log(`Grafik sayfasına gidiliyor: ${chartUrl}`);
 
         await page.goto(chartUrl, {
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'networkidle0', // Tüm network istekleri bitene kadar bekle
             timeout: 120000
         });
 
         console.log('Sayfa yüklendi, grafik elementi bekleniyor...');
-        await page.waitForSelector('.chart-gui-wrapper', { timeout: 120000 });
-        console.log('Grafik elementi bulundu.');
+        
+        // Daha güvenli element bekleme
+        let chartElement;
+        const selectors = [
+            '.chart-gui-wrapper',
+            '.chart-container', 
+            '#chart-container',
+            '.tv-chart-container',
+            '.chart'
+        ];
+        
+        for (const selector of selectors) {
+            try {
+                await page.waitForSelector(selector, { timeout: 30000, visible: true });
+                chartElement = await page.$(selector);
+                if (chartElement) {
+                    console.log(`✓ Grafik elementi bulundu: ${selector}`);
+                    break;
+                }
+            } catch (e) {
+                console.log(`⚠️ ${selector} bulunamadı, diğeri deneniyor...`);
+            }
+        }
+
+        if (!chartElement) {
+            // Tam sayfa screenshot'ı al
+            console.log('⚠️ Grafik elementi bulunamadı, tam sayfa screenshot alınıyor...');
+            const fullPagePath = path.join(screenshotsDir, `full-page-${Date.now()}.png`);
+            await page.screenshot({ 
+                path: fullPagePath, 
+                fullPage: true 
+            });
+            console.log(`📸 Tam sayfa screenshot: ${fullPagePath}`);
+            
+            throw new Error('Grafik elementi sayfada bulunamadı!');
+        }
 
         // Pop-up ve çerez bildirimlerini kapatmaya çalış
         try {
             console.log('Çerez veya pop-up bildirimi aranıyor...');
-            const acceptButton = await page.waitForSelector('button[data-name="accept-recommended-settings"]', { timeout: 5000 });
-            if (acceptButton) {
-                console.log('Çerez bildirimi kapatılıyor.');
-                await acceptButton.click();
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        } catch (error) {
-            console.log('Kapatılacak bir pop-up bulunamadı, devam ediliyor.');
-        }
-
-        // Additional popup handling
-        try {
-            const closeButtons = await page.$$('button[aria-label="Close"], button[data-name="close"], .close-button, .modal-close');
-            for (const button of closeButtons) {
+            const popupSelectors = [
+                'button[data-name="accept-recommended-settings"]',
+                'button[data-name="close"]',
+                '.close-button',
+                '.modal-close',
+                '[aria-label="Close"]'
+            ];
+            
+            for (const selector of popupSelectors) {
                 try {
-                    await button.click();
-                    console.log('Pop-up kapatıldı');
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    const button = await page.$(selector);
+                    if (button) {
+                        console.log(`Pop-up kapatılıyor: ${selector}`);
+                        await button.click();
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
                 } catch (e) {
-                    // Ignore if button is not clickable
+                    // Devam et
                 }
             }
         } catch (error) {
-            console.log('Ek pop-up kontrolü tamamlandı');
+            console.log('Pop-up kontrolü tamamlandı');
         }
 
         // Grafik arayüzünü optimize et
@@ -183,22 +310,57 @@ async function takeChartScreenshot() {
         console.log('Optimizasyon tamamlandı.');
 
         // İndikatörlerin çizilmesi için bekleme
-        console.log('İndikatörlerin çizilmesi için 5 saniye bekleniyor...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log('İndikatörlerin çizilmesi için 8 saniye bekleniyor...');
+        await new Promise(resolve => setTimeout(resolve, 8000));
 
-        // Hata ayıklama (debug) için ekran görüntüsü al
-        const chartElement = await page.$('.chart-gui-wrapper');
-        if (!chartElement) {
-            throw new Error('Grafik elementi sayfada bulunamadı!');
+        // Elementin görünür olduğunu kontrol et
+        const isVisible = await chartElement.evaluate(el => {
+            const rect = el.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 && 
+                   rect.top >= 0 && rect.left >= 0;
+        });
+
+        if (!isVisible) {
+            console.log('⚠️ Element görünür değil, tam sayfa screenshot alınıyor...');
+            const timestamp = Date.now();
+            const fullPagePath = path.join(screenshotsDir, `backup-screenshot-${timestamp}.png`);
+            await page.screenshot({ 
+                path: fullPagePath, 
+                fullPage: true 
+            });
+            console.log(`📸 Yedek screenshot: ${fullPagePath}`);
         }
 
-        const debugImagePath = path.join(screenshotsDir, 'debug_screenshot.png');
-        await chartElement.screenshot({ path: debugImagePath });
-        console.log(`Debug ekran görüntüsü şuraya kaydedildi: ${debugImagePath}`);
+        // Debug için ekran görüntüsü al
+        const timestamp = Date.now();
+        const debugImagePath = path.join(screenshotsDir, `debug_screenshot_${timestamp}.png`);
+        
+        try {
+            if (isVisible) {
+                await chartElement.screenshot({ path: debugImagePath });
+            } else {
+                await page.screenshot({ path: debugImagePath, fullPage: true });
+            }
+            console.log(`Debug ekran görüntüsü kaydedildi: ${debugImagePath}`);
+        } catch (screenshotError) {
+            console.log('Screenshot alma hatası, tam sayfa deneniyor...');
+            await page.screenshot({ path: debugImagePath, fullPage: true });
+        }
 
         // Piksel analizi
         console.log('👀 Pixel analizi başlıyor...');
-        const imageBuffer = await chartElement.screenshot();
+        let imageBuffer;
+        
+        try {
+            if (isVisible) {
+                imageBuffer = await chartElement.screenshot();
+            } else {
+                imageBuffer = await page.screenshot({ fullPage: true });
+            }
+        } catch (e) {
+            imageBuffer = await page.screenshot({ fullPage: true });
+        }
+        
         const jimpImage = await JIMP.read(imageBuffer);
 
         // Bu koordinatları debug ekran görüntüsünü inceleyerek bulmalısınız!
@@ -212,21 +374,25 @@ async function takeChartScreenshot() {
         const isGreen = g > r + 50 && g > b + 50;
         const isRed = r > g + 50 && r > b + 50;
 
-        let signal = 'none';
+        let signal = 'yok';
         if (isGreen) {
             console.log('Sinyal: Yeşil bulundu! 🟢');
-            signal = 'green';
+            signal = 'YEŞİL';
+            // Bildirim gönder
+            await sendNotifications(debugImagePath, 'YEŞİL');
         } else if (isRed) {
             console.log('Sinyal: Kırmızı bulundu! 🔴');
-            signal = 'red';
+            signal = 'KIRMIZI';
+            // Bildirim gönder
+            await sendNotifications(debugImagePath, 'KIRMIZI');
         } else {
             console.log('⏳ Sinyal yok...');
         }
 
-        // Update result
+        // Sonucu güncelle
         lastResult = {
             timestamp: new Date().toISOString(),
-            status: 'completed',
+            status: 'tamamlandı',
             signal: signal,
             error: null,
             pixelColor: { r, g, b }
@@ -238,8 +404,8 @@ async function takeChartScreenshot() {
         console.error('Bir hata oluştu:', error);
         lastResult = {
             timestamp: new Date().toISOString(),
-            status: 'error',
-            signal: 'none',
+            status: 'hata',
+            signal: 'yok',
             error: error.message,
             pixelColor: null
         };
@@ -254,7 +420,7 @@ async function takeChartScreenshot() {
 
 // HTTP Server
 const server = http.createServer(async (req, res) => {
-    // Set CORS headers
+    // CORS headers ayarla
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -274,15 +440,15 @@ const server = http.createServer(async (req, res) => {
             case '/health':
                 res.writeHead(200);
                 res.end(JSON.stringify({
-                    status: 'healthy',
-                    message: 'TradingView Bot is running',
+                    status: 'sağlıklı',
+                    message: 'TradingView Bot çalışıyor',
                     timestamp: new Date().toISOString(),
                     lastResult: lastResult
                 }));
                 break;
 
             case '/scan':
-                console.log('🚀 Manual scan request received');
+                console.log('🚀 Manuel tarama isteği alındı');
                 try {
                     const result = await takeChartScreenshot();
                     res.writeHead(200);
@@ -308,47 +474,47 @@ const server = http.createServer(async (req, res) => {
             default:
                 res.writeHead(404);
                 res.end(JSON.stringify({
-                    error: 'Endpoint not found',
+                    error: 'Endpoint bulunamadı',
                     availableEndpoints: ['/', '/health', '/scan', '/status']
                 }));
         }
     } catch (error) {
-        console.error('Server error:', error);
+        console.error('Server hatası:', error);
         res.writeHead(500);
         res.end(JSON.stringify({
-            error: 'Internal server error',
+            error: 'İç server hatası',
             message: error.message
         }));
     }
 });
 
-// Periodic scanning (her 5 dakikada bir)
+// Periyodik tarama (her 5 dakikada bir)
 setInterval(async () => {
     try {
-        console.log('🔄 Periodic scan starting...');
+        console.log('🔄 Periyodik tarama başlıyor...');
         await takeChartScreenshot();
-        console.log('✓ Periodic scan completed');
+        console.log('✓ Periyodik tarama tamamlandı');
     } catch (error) {
-        console.error('❌ Periodic scan failed:', error);
+        console.error('❌ Periyodik tarama başarısız:', error);
     }
-}, 5 * 60 * 1000); // 5 minutes
+}, 5 * 60 * 1000); // 5 dakika
 
-// Start server
+// Sunucuyu başlat
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Bot server started on port ${PORT}`);
-    console.log(`Available endpoints:`);
-    console.log(`  - GET /health - Health check`);
-    console.log(`  - GET /scan - Manual scan`);
-    console.log(`  - GET /status - Last scan result`);
+    console.log(`🚀 Bot sunucusu ${PORT} portunda başlatıldı`);
+    console.log(`Mevcut endpoint'ler:`);
+    console.log(`  - GET /health - Sağlık kontrolü`);
+    console.log(`  - GET /scan - Manuel tarama`);
+    console.log(`  - GET /status - Son tarama sonucu`);
     
-    // Run initial scan
+    // İlk taramayı başlat
     setTimeout(async () => {
         try {
-            console.log('🚀 Initial scan starting...');
+            console.log('🚀 İlk tarama başlıyor...');
             await takeChartScreenshot();
-            console.log('✓ Initial scan completed');
+            console.log('✓ İlk tarama tamamlandı');
         } catch (error) {
-            console.error('❌ Initial scan failed:', error);
+            console.error('❌ İlk tarama başarısız:', error);
         }
-    }, 5000); // Wait 5 seconds after server start
+    }, 5000); // Sunucu başladıktan 5 saniye sonra
 });
