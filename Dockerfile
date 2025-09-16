@@ -38,41 +38,4 @@ EXPOSE 10000
 
 # Start the application
 CMD ["npm", "start"]
-```
 
-## 5. `optimizeChart.js` (Eksik dosya)
-
-```javascript
-// optimizeChart.js
-export default async function optimizeChart(page) {
-    try {
-        console.log('Grafik optimizasyonu başlıyor...');
-        
-        // Yan panelleri gizle
-        await page.evaluate(() => {
-            // Sağ panel
-            const rightPanel = document.querySelector('.layout__area--right');
-            if (rightPanel) rightPanel.style.display = 'none';
-            
-            // Sol panel
-            const leftPanel = document.querySelector('.layout__area--left');
-            if (leftPanel) leftPanel.style.display = 'none';
-            
-            // Üst toolbar
-            const toolbar = document.querySelector('.js-header');
-            if (toolbar) toolbar.style.display = 'none';
-            
-            // Alt panel
-            const bottomPanel = document.querySelector('.layout__area--bottom');
-            if (bottomPanel) bottomPanel.style.display = 'none';
-            
-            // Reklam alanları
-            const ads = document.querySelectorAll('[class*="ad"], [id*="ad"]');
-            ads.forEach(ad => ad.style.display = 'none');
-        });
-        
-        console.log('✓ Grafik optimizasyonu tamamlandı');
-    } catch (error) {
-        console.log('⚠️ Grafik optimizasyonu sırasında hata:', error.message);
-    }
-}
