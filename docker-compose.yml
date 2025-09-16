@@ -2,18 +2,20 @@ services:
   - type: web
     name: tradingview-bot
     env: docker
+    repo: # your-repo-url-here
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: starter
     buildCommand: npm install
     startCommand: npm start
-    plan: starter
-    region: oregon
     envVars:
       - key: NODE_ENV
         value: production
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: "true"
+        value: true
       - key: CHROME_BIN
         value: /usr/bin/google-chrome-stable
       - key: TELEGRAM_BOT_TOKEN
         value: 8228322013:AAFEoX5PA76AoRFWA6H5k6Zn7x34RuVOXck
       - key: TELEGRAM_CHAT_ID
-        value: "1347185585"
+        value: 1347185585
