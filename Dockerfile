@@ -31,7 +31,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Node dependencies yükle
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Playwright Chromium browser'ı yükle (ÖNEMLİ ADIM!)
 RUN npx playwright install chromium
