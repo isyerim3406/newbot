@@ -1,43 +1,58 @@
-# Use Node.js 18 LTS
+# TradingView Bot için Render Dockerfile
 FROM node:18-slim
 
-# Install necessary packages for Puppeteer and Google Chrome
+# Sistem bağımlılıklarını yükle (Playwright için gerekli)
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
     procps \
     libxss1 \
-    --no-install-recommends \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable --no-install-recommends \
+    libgconf-2-4 \
+    libxtst6 \
+    libxrandr2 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libcairo-gobject2 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0 \
+    fonts-liberation \
+    libappindicator3-1 \
+    libnss3 \
+    lsb-release \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Çalışma dizini
 WORKDIR /app
 
-# Copy package files
+# Package dosyalarını kopyala
 COPY package*.json ./
 
-# Set environment variable to skip Chromium download by Puppeteer
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# Node dependencies yükle
+RUN npm ci --only=production
 
-# Install dependencies
-RUN npm install
+# Playwright Chromium browser'ı yükle (ÖNEMLİ ADIM!)
+RUN npx playwright install chromium
+RUN npx playwright install-deps chromium
 
-# Copy application code
+# Uygulama dosyalarını kopyala
 COPY . .
 
-# Create screenshots directory (gerçi kodda da oluşturuluyor ama garanti olsun)
-RUN mkdir -p screenshots
+# Screenshots dizini oluştur
+RUN mkdir -p /app/screenshots && chmod 777 /app/screenshots
 
-# Set executable path for Chrome for Puppeteer to find it
-ENV CHROME_BIN=/usr/bin/google-chrome-stable
+# Environment variables
+ENV NODE_ENV=production
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/node_modules/.cache/ms-playwright
 
-# <<< DEĞİŞİKLİK: Uygulamanın dinlediği port ile eşleştirildi
-EXPOSE 10000
+# Port
+EXPOSE 8080
 
-# Run the application
-CMD ["npm", "start"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Uygulamayı başlat
+CMD ["node", "index.js"]
