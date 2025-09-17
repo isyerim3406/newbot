@@ -1,24 +1,13 @@
 {
-  "name": "tradingview-bot",
-  "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "build": "npm install"
-  },
   "dependencies": {
-    "puppeteer": "^24.20.0",
+    "playwright": "^1.40.0",
     "jimp": "^0.22.10",
-    "dotenv": "^16.3.1",
-    "nodemailer": "^6.9.8",
-    "axios": "^1.6.0",
-    "form-data": "^4.0.0" 
+    "axios": "^1.6.2",
+    "form-data": "^4.0.0",
+    "express": "^4.18.2"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": ["puppeteer", "trading", "automation"],
-  "description": "TradingView chart automation bot"
+  "scripts": {
+    "start": "node index.js"
+  }
 }
