@@ -1,7 +1,7 @@
-# TradingView Bot için Render Dockerfile
+# Puppeteer için optimized Dockerfile
 FROM node:18-slim
 
-# Sistem bağımlılıklarını yükle (Playwright için gerekli)
+# Chrome dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -24,28 +24,33 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# Chrome binary yükle
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
+
 # Çalışma dizini
 WORKDIR /app
 
-# Package dosyalarını kopyala
+# Package files kopyala
 COPY package*.json ./
 
-# Node dependencies yükle
+# Dependencies yükle
 RUN npm install --omit=dev
 
-# Playwright Chromium browser'ı yükle (ÖNEMLİ ADIM!)
-RUN npx playwright install chromium
-RUN npx playwright install-deps chromium
-
-# Uygulama dosyalarını kopyala
+# App files kopyala
 COPY . .
 
-# Screenshots dizini oluştur
+# Screenshots dizini
 RUN mkdir -p /app/screenshots && chmod 777 /app/screenshots
 
 # Environment variables
 ENV NODE_ENV=production
-ENV PLAYWRIGHT_BROWSERS_PATH=/app/node_modules/.cache/ms-playwright
+ENV CHROME_BIN=/usr/bin/google-chrome-stable
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 # Port
 EXPOSE 8080
@@ -54,5 +59,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Uygulamayı başlat
+# Start
 CMD ["node", "index.js"]
