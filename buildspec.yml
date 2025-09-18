@@ -1,0 +1,23 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Docker'da oturum açılıyor..."
+      - aws --version
+      - $(aws ecr get-login --no-include-email)
+      - REPOSITORY_URI=YOUR_ECR_REPOSITORY_URI # ECR'deki depo URI'nizi buraya yapıştırın
+
+  build:
+    commands:
+      - echo "Docker imajı oluşturuluyor..."
+      - docker build -t $REPOSITORY_URI:latest .
+
+  post_build:
+    commands:
+      - echo "Oluşturulan Docker imajı ECR'ye yükleniyor..."
+      - docker push $REPOSITORY_URI:latest
+
+artifacts:
+  files:
+    - '**/*'
