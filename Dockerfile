@@ -1,17 +1,29 @@
 # Base image
 FROM node:18-slim
 
-# Çalışma dizini
+# Çalışma dizinini ayarla
 WORKDIR /app
 
-# package.json ve package-lock.json kopyala
+# Gerekli sistem paketlerini kur ve Google Chrome'u yükle
+RUN apt-get update && apt-get install -y \
+    wget curl unzip gnupg --no-install-recommends \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# package.json ve package-lock.json dosyalarını kopyala
 COPY package*.json ./
+
+# npm bağımlılıklarını kur
+RUN npm install
 
 # Uygulama dosyalarını kopyala
 COPY . .
 
-# Render’da kullanılacak port
-EXPOSE 3000
+# Puppeteer'ın Chrome'u doğru bulmasını sağla
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Başlatma komutu
+# Başlangıç komutu
 CMD ["/usr/bin/node", "index.js"]
