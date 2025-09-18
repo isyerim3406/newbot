@@ -1,5 +1,5 @@
 # Base image
-FROM node:16.20.0-bullseye-slim
+FROM node:18-slim
 
 # Gerekli sistem paketlerini kur ve sertifika paketlerini ekle
 RUN apt-get update && apt-get install -y \
