@@ -6,7 +6,7 @@ phases:
       - echo "Docker'da oturum açılıyor..."
       - aws --version
       - $(aws ecr get-login --no-include-email)
-      - REPOSITORY_URI=YOUR_ECR_REPOSITORY_URI # ECR'deki depo URI'nizi buraya yapıştırın
+      - REPOSITORY_URI=782634014468.dkr.ecr.eu-north-1.amazonaws.com/tradingview-bot
 
   build:
     commands:
