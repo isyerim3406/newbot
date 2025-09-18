@@ -20,7 +20,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # npm bağımlılıklarını kur
-RUN npm install
+RUN npm cache clean --force && npm install
 
 # Uygulama dosyalarını kopyala
 COPY . .
