@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "puppeteer": "^21.3.8",
-    "puppeteer-extra": "^11.1.0",
+    "puppeteer-extra": "^10.0.0",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "jimp": "^0.22.10",
     "dotenv": "^16.3.1",
