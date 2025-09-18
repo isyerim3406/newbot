@@ -1,17 +1,19 @@
 # Base image
 FROM node:18-slim
 
-# Çalışma dizinini ayarla
-WORKDIR /app
-
-# Gerekli sistem paketlerini kur ve Google Chrome'u yükle
+# Gerekli sistem paketlerini kur
 RUN apt-get update && apt-get install -y \
-    wget curl unzip gnupg --no-install-recommends \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    wget curl unzip gnupg --no-install-recommends
+
+# Google Chrome'u kur ve paket anahtarını güncel yöntemle ekle
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/trusted.gpg.d/google-chrome.gpg \
     && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Çalışma dizinini ayarla
+WORKDIR /app
 
 # package.json ve package-lock.json dosyalarını kopyala
 COPY package*.json ./
