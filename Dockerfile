@@ -1,9 +1,9 @@
 # Base image
 FROM node:18-slim
 
-# Gerekli sistem paketlerini kur
+# Gerekli sistem paketlerini kur ve sertifika paketlerini ekle
 RUN apt-get update && apt-get install -y \
-    wget curl unzip gnupg --no-install-recommends
+    wget curl unzip gnupg ca-certificates apt-transport-https --no-install-recommends
 
 # Google Chrome'u kur ve paket anahtarını güncel yöntemle ekle
 RUN wget -O /tmp/google.gpg https://dl.google.com/linux/linux_signing_key.pub \
