@@ -4,9 +4,8 @@ phases:
   pre_build:
     commands:
       - echo "Docker'da oturum açılıyor..."
-      - aws --version
-      - $(aws ecr get-login --no-include-email)
       - REPOSITORY_URI=782634014468.dkr.ecr.eu-north-1.amazonaws.com/tradingview-bot
+      - aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin $REPOSITORY_URI
 
   build:
     commands:
