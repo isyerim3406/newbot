@@ -14,7 +14,7 @@ RUN wget -O /tmp/google.gpg https://dl.google.com/linux/linux_signing_key.pub \
     && rm -rf /var/lib/apt/lists/*
     
 # Çalışma dizinini ayarla
-WORKDIR /app
+WORKDIR /usr/src/app
 
 # package.json ve package-lock.json dosyalarını kopyala
 COPY package*.json ./
