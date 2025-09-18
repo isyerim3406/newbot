@@ -2,23 +2,16 @@
   "name": "tradingview-bot",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "build": "npm install"
+    "start": "node index.js"
   },
   "dependencies": {
-    "puppeteer": "^24.20.0",
+    "puppeteer": "^21.3.8",
+    "puppeteer-extra": "^11.1.0",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "jimp": "^0.22.10",
     "dotenv": "^16.3.1",
-    "nodemailer": "^6.9.8",
-    "axios": "^1.6.0",
-    "form-data": "^4.0.0" 
+    "node-telegram-bot-api": "^0.61.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": ["puppeteer", "trading", "automation"],
-  "description": "TradingView chart automation bot"
+  "_comment": "Puppeteer skip Chromium download handled via environment variable"
 }
