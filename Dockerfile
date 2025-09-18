@@ -1,5 +1,5 @@
 # Base image
-FROM node:18-slim
+FROM node:16.20.0-bullseye-slim
 
 # Gerekli sistem paketlerini kur ve sertifika paketlerini ekle
 RUN apt-get update && apt-get install -y \
@@ -20,7 +20,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # npm bağımlılıklarını kur
-RUN npm cache clean --force && npm install
+RUN npm install
 
 # Uygulama dosyalarını kopyala
 COPY . .
